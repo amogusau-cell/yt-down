@@ -21,7 +21,7 @@ interface StatusMessage {
   current_process: string;
   current_video_progress: number;
   current_process_progress: number;
-  current_process_video_count: string;
+  current_process_video_count: number;
   process_eta: number;
   current_video_id: string;
 }
@@ -143,6 +143,18 @@ function SelectedTask() {
 
   if (statusData?.current_process == id) {
     send("start");
+
+    const processProgress = progress?.current_process_progress ?? 0;
+    const videoProgress = progress?.current_video_progress ?? 0;
+    const videoCount = progress?.current_process_video_count
+      ? Number(progress.current_process_video_count)
+      : 0;
+
+    const percent =
+      videoCount > 0
+        ? processProgress + videoProgress / videoCount
+        : processProgress;
+
     progress_bar = (
       <>
         <div>
@@ -158,23 +170,12 @@ function SelectedTask() {
             <div
               className="progress-bar bg-success rounded-pill"
               role="progressbar"
-              style={{
-                width: `${
-                  progress?.current_process_progress +
-                  progress?.current_video_progress /
-                    progress?.current_process_video_count
-                }%`,
-              }}
-              aria-valuenow={progress?.current_video_progress}
+              style={{ width: `${percent}%` }}
+              aria-valuenow={videoProgress}
               aria-valuemin={0}
               aria-valuemax={100}
             >
-              {(
-                progress?.current_process_progress +
-                progress?.current_video_progress /
-                  progress?.current_process_video_count
-              ).toFixed(1)}
-              %
+              {percent.toFixed(1)}%
             </div>
           </div>
         </div>

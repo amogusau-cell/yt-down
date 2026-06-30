@@ -84,12 +84,12 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-@app.get("/")
+@app.get("/api/")
 def root_api():
     return {"message": "Hello World"}
 
 
-@app.post("/login")
+@app.post("/api/login")
 def login_api(username: str = Form(...), password: str = Form(...)):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username or password is required")
@@ -102,7 +102,7 @@ def login_api(username: str = Form(...), password: str = Form(...)):
     return create_user_token(username, password, usr.role)
 
 
-@app.post("/register")
+@app.post("/api/register")
 def register_api(username: str = Form(...), password: str = Form(...)):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username or password is required")
@@ -110,7 +110,7 @@ def register_api(username: str = Form(...), password: str = Form(...)):
     return "User created successfully"
 
 
-@app.post("/register/admin")
+@app.post("/api/register/admin")
 def register_admin_api(username: str = Form(...), password: str = Form(...)):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username or password is required")
@@ -126,7 +126,7 @@ def register_admin_api(username: str = Form(...), password: str = Form(...)):
     return "Allow admin from server file"
 
 
-@app.post("/register/admin/checked")
+@app.post("/api/register/admin/checked")
 def registered_admin_api(username: str = Form(...), password: str = Form(...)):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username or password is required")
@@ -145,7 +145,7 @@ def registered_admin_api(username: str = Form(...), password: str = Form(...)):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
 
 
-@app.delete("/user/{username}")
+@app.delete("/api/user/{username}")
 def delete_user_api(username: str, user=Depends(verify_admin_token)):
     if not(user["role"] == "admin" or user["sub"] == username):
         raise HTTPException(status_code=403, detail="No permission")
@@ -153,7 +153,7 @@ def delete_user_api(username: str, user=Depends(verify_admin_token)):
     return {"message": "User successfully deleted"}
 
 
-@app.get("/user/{username}")
+@app.get("/api/user/{username}")
 def get_user_api(username: str, user=Depends(verify_admin_token)):
     usr = get_user_by_username(username)
     if not usr:
@@ -161,28 +161,28 @@ def get_user_api(username: str, user=Depends(verify_admin_token)):
     return usr
 
 
-@app.get("/user")
+@app.get("/api/user")
 def get_all_users_api(user=Depends(verify_admin_token)):
     return {"users": get_all_users()}
 
 
-@app.get("/protected")
+@app.get("/api/protected")
 def protected_api(user=Depends(verify_token)):
     return {"message": user}
 
-@app.get("/process")
+@app.get("/api/process")
 def get_process_api(user=Depends(verify_token)):
     process_id = []
     for process in get_all_processes():
         process_id.append(process.id)
     return {"process": process_id}
 
-@app.post("/process")
+@app.post("/api/process")
 def create_process_api(user=Depends(verify_token), type: str=Form(...), playlist: str=Form(...), title: str=Form(...), process: str=Form(...), private: bool=Form(...)):
     created_process = create_process(user["sub"], process, private, title, type, playlist)
     return {"message": "Process created successfully", "process_id": created_process}
 
-@app.get("/process/{process_id}")
+@app.get("/api/process/{process_id}")
 def get_process_api(process_id: str, user=Depends(verify_token)):
     int_process_id = uuid.UUID(process_id)
     sel_process = get_process(int_process_id)
@@ -216,7 +216,7 @@ def get_process_api(process_id: str, user=Depends(verify_token)):
     return data
 
 #Video managing
-@app.get("/{token}/videos/{video_id}/thumbnail")
+@app.get("/api/{token}/videos/{video_id}/thumbnail")
 def get_remote_image_api(video_id: str):
     #First check cache
     thumb_path = Path(cache / f"videos/{video_id}/thumbnail.jpg")
@@ -243,7 +243,7 @@ def get_remote_image_api(video_id: str):
         media_type="image/jpeg"
     )
 
-@app.get("/videos")
+@app.get("/api/videos")
 def get_videos_api(user=Depends(verify_token)):
     vids = get_all_videos()
     video_ids = []
@@ -251,7 +251,7 @@ def get_videos_api(user=Depends(verify_token)):
         video_ids.append(vid.id)
     return {"videos": video_ids}
 
-@app.get("/videos/{video_id}/detail")
+@app.get("/api/videos/{video_id}/detail")
 def get_video_detail_api(video_id: str, user=Depends(verify_token)):
     vid_detail = Path(cache / f"videos/{video_id}")
     vid_detail.mkdir(exist_ok=True, parents=True)
@@ -273,7 +273,7 @@ def get_video_detail_api(video_id: str, user=Depends(verify_token)):
     }
     return data
 
-@app.get("/playlist/{playlist_id}/detail")
+@app.get("/api/playlist/{playlist_id}/detail")
 def get_playlist_detail_api(playlist_id: str, user=Depends(verify_token)):
     vid_detail = Path(cache / f"playlists/{playlist_id}")
     vid_detail.mkdir(parents=True, exist_ok=True)
@@ -291,7 +291,7 @@ def get_playlist_detail_api(playlist_id: str, user=Depends(verify_token)):
         vids.append(item["id"])
     return vids
 
-@app.get("/{token}/videos/{video_id}")
+@app.get("/api/{token}/videos/{video_id}")
 def get_video_api(video_id: str, token: str):
     verify_token(token)
     vid = get_video(video_id)
@@ -305,7 +305,7 @@ def get_video_api(video_id: str, token: str):
         filename=f"{vid_path.name}"
     )
 
-@app.websocket("/ws/progress")
+@app.websocket("/api/ws/progress")
 async def progress_ws(websocket: WebSocket):
     await manager.connect(websocket)
     try:
@@ -339,6 +339,6 @@ async def start_download_task(ws: WebSocket):
         await ws.send_json(data)
         await asyncio.sleep(0.25)
 
-@app.get("/status")
+@app.get("/api/status")
 def status_api(user=Depends(verify_token)):
     return {app.state["shared"]}

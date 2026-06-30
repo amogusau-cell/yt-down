@@ -9,7 +9,7 @@ function Test() {
       .then(setData);
   }, []);
 
-  var text;
+  let text;
 
   if (data != null) {
     text = data["message"];

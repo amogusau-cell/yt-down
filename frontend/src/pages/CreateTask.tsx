@@ -1,6 +1,6 @@
 import { Button, Form } from "react-bootstrap";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import CreateComponent from "../components/CreateComponent.tsx";

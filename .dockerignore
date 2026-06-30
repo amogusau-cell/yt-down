@@ -1,0 +1,32 @@
+# git
+.git
+.gitignore
+
+# frontend
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/*.log
+
+# backend
+backend/__pycache__
+backend/**/__pycache__
+backend/*.pyc
+backend/.venv
+backend/venv
+backend/.env
+backend/.pytest_cache
+
+backend/cache
+backend/config
+backend/Shows
+backend/Videos
+
+# editors / OS
+.vscode
+.idea
+.DS_Store
+
+# misc
+*.md
+README.md

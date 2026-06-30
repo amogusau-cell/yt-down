@@ -24,7 +24,13 @@ interface StatusMessage {
   current_video_id: string;
 }
 
-function TaskComponent({ id, set }: { id: string; set: any }) {
+function TaskComponent({
+  id,
+  set,
+}: {
+  id: string;
+  set: React.Dispatch<React.SetStateAction<boolean | null>>;
+}) {
   const [searchParams] = useSearchParams();
   const [data, setData] = useState<ApiResponse | null>(null);
   const [statusData, statusSetData] = useState<StatusMessage | null>(null);
@@ -117,45 +123,46 @@ function TaskComponent({ id, set }: { id: string; set: any }) {
   let progress_bar = <></>;
   if (statusData?.current_process == id) {
     send("start");
+
+    const processProgress = progress?.current_process_progress ?? 0;
+    const videoProgress = progress?.current_video_progress ?? 0;
+    const videoCount = progress?.current_process_video_count
+      ? Number(progress.current_process_video_count)
+      : 0;
+
+    const percent =
+      videoCount > 0
+        ? processProgress + videoProgress / videoCount
+        : processProgress;
+
     progress_bar = (
       <>
         <div>
-          <p>Status:</p>
           {connected ? (
             <p className="text-success mb-1 mt-2">Connected</p>
           ) : (
             <p className="text-danger mb-1 mt-2">Disconnected</p>
           )}
-        </div>
-        <div
-          className="progress rounded-pill"
-          style={{ height: "1.25rem", width: "100%" }}
-        >
           <div
-            className="progress-bar bg-success rounded-pill"
-            role="progressbar"
-            style={{
-              width: `${
-                progress?.current_process_progress +
-                progress?.current_video_progress /
-                  progress?.current_process_video_count
-              }%`,
-            }}
-            aria-valuenow={progress?.current_video_progress}
-            aria-valuemin={0}
-            aria-valuemax={100}
+            className="progress rounded-pill"
+            style={{ height: "1.25rem", width: "100%" }}
           >
-            {(
-              progress?.current_process_progress +
-              progress?.current_video_progress /
-                progress?.current_process_video_count
-            ).toFixed(1)}
-            %
+            <div
+              className="progress-bar bg-success rounded-pill"
+              role="progressbar"
+              style={{ width: `${percent}%` }}
+              aria-valuenow={videoProgress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              {percent.toFixed(1)}%
+            </div>
           </div>
         </div>
       </>
     );
   }
+
   let content;
   if (data.type == "video") {
     content = (

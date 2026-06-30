@@ -5,7 +5,7 @@ export type ProgressMessage = {
   current_process: string;
   current_video_progress: number;
   current_process_progress: number;
-  current_process_video_count: string;
+  current_process_video_count: number;
   process_eta: number;
   current_video_id: string;
 };

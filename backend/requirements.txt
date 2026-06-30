@@ -7,3 +7,4 @@ pyaml
 sqlalchemy
 bcrypt
 yt-dlp[default,curl-cffi]
+requests
