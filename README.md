@@ -1,0 +1,2 @@
+# yt-down
+Love watching YouTube but don’t want to rely on an internet connection while you’re on vacation? This self-hosted app lets you download YouTube videos and playlists and integrate them with Jellyfin. That way, you can enjoy your favorite YouTube content anytime, anywhere. Even completely offline.

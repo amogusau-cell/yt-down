@@ -1,0 +1,40 @@
+:root,
+[data-bs-theme=light] {
+  --bs-darker-rgb: 23, 26, 29;
+  --bs-lighter-rgb: 38, 42, 46;
+}
+
+.bg-darker {
+    --bs-bg-opacity: 1;
+    background-color: rgba(var(--bs-darker-rgb), var(--bs-bg-opacity)) !important;
+}
+
+.btn-darker {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: #171a1d;
+  --bs-btn-border-color: #171a1d;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #424649;
+  --bs-btn-hover-border-color: #373b3e;
+  --bs-btn-focus-shadow-rgb: 66, 70, 73;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #4d5154;
+  --bs-btn-active-border-color: #373b3e;
+  --bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
+  --bs-btn-disabled-color: #fff;
+  --bs-btn-disabled-bg: #171a1d;
+  --bs-btn-disabled-border-color: #171a1d;
+}
+
+.bg-lighter {
+    --bs-bg-opacity: 1;
+    background-color: rgba(var(--bs-lighter-rgb), var(--bs-bg-opacity)) !important;
+}
+
+.min-h-100 {
+  min-height: 100% !important;
+}
+
+.form-control::placeholder {
+  color: rgba(255, 255, 255, 0.5) !important;
+}

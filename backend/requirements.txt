@@ -1,0 +1,9 @@
+python-jose
+passlib
+python-multipart
+fastapi
+uvicorn
+pyaml
+sqlalchemy
+bcrypt
+yt-dlp[default,curl-cffi]
