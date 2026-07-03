@@ -8,7 +8,5 @@ z -> Bugfix.
 
 ---
 
-V0.0.0 -> Inital release. Has functions to download videos and playlists. Also allows the user to download individual videos. Pulling:
-```bash
-docker pull ghcr.io/amogusau-cell/yt-down:0.0.0
-```
+V0.0.0 -> Inital release. Has functions to download videos and playlists. Also allows the user to download individual videos.
+V0.0.1 -> Added health checks to the server.

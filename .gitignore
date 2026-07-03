@@ -52,3 +52,4 @@ backend/Shows/
 backend/Videos/
 
 build-command
+.env

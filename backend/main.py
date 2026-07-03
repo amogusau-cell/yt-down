@@ -84,9 +84,9 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-@app.get("/api/")
-def root_api():
-    return {"message": "Hello World"}
+@app.get("/api/health")
+def health_api():
+    return {"message": "Running fine..."}
 
 
 @app.post("/api/login")

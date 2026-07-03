@@ -1,10 +1,12 @@
+import os
+
 import jose
 from fastapi import HTTPException, Header
 from jose import jwt
 from datetime import datetime, timedelta, timezone
 from db_helper import check_user_password, get_user_by_username
 
-SECRET = "veryverysecret"
+SECRET = os.getenv("JWT_SECRET", "notsosecretdefaulttokenthatyoushouldprobablychangeprettysoon")
 
 
 def verify_token(token: str = Header(...)):
