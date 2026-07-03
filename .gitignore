@@ -50,3 +50,5 @@ backend/cache/
 backend/config/
 backend/Shows/
 backend/Videos/
+
+build-command
