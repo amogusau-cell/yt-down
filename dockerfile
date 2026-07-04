@@ -9,9 +9,12 @@ RUN npm run build
 # ---- Stage 2: backend + nginx ----
 FROM python:3.12-slim
 
-# install nginx and supervisor
-RUN apt update && apt install -y curl
-RUN apt-get update && apt-get install -y nginx supervisor ffmpeg && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y unzip curl nginx supervisor ffmpeg && rm -rf /var/lib/apt/lists/*
+
+# Install Deno to a fixed location and make sure it's on PATH for the running container
+ENV DENO_INSTALL=/usr/local/deno
+RUN curl -fsSL https://deno.land/install.sh | sh
+ENV PATH="${DENO_INSTALL}/bin:${PATH}"
 
 WORKDIR /app
 COPY backend/requirements.txt .
