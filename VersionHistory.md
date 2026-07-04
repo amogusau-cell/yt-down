@@ -10,3 +10,4 @@ z -> Bugfix.
 
 V0.0.0 -> Inital release. Has functions to download videos and playlists. Also allows the user to download individual videos.
 V0.0.1 -> Added health checks to the server.
+V0.0.2 -> Fixed a bug where the docker container would look unhealthy.

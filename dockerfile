@@ -10,6 +10,7 @@ RUN npm run build
 FROM python:3.12-slim
 
 # install nginx and supervisor
+RUN apt update && apt install -y curl
 RUN apt-get update && apt-get install -y nginx supervisor ffmpeg && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
