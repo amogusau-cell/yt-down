@@ -162,26 +162,6 @@ def _pretty_xml(root: ET.Element) -> str:
     return reparsed.toprettyxml(indent="  ", encoding=None)
 
 
-def _extract_downloaded_path(info: dict) -> Path | None:
-    """
-    Return the actual on-disk path yt-dlp wrote for this download, using
-    yt-dlp's own report of what it produced (post-merge, post-sanitization)
-    rather than reconstructing the filename from the video title ourselves.
-    yt-dlp may substitute filesystem-unsafe characters (e.g. '|' → '｜') when
-    it writes the file, so any hand-built path can silently mismatch.
-    """
-    requested = info.get("requested_downloads") or []
-    if requested:
-        fp = requested[0].get("filepath") or requested[0].get("_filename")
-        if fp:
-            return Path(fp)
-    # Fallback for older yt-dlp / edge cases
-    fp = info.get("filepath") or info.get("_filename")
-    if fp:
-        return Path(fp)
-    return None
-
-
 # ---------------------------------------------------------------------------
 # Jellyfin NFO writers
 # ---------------------------------------------------------------------------
@@ -470,26 +450,22 @@ def process_item(process_id: str):
             url = f"https://www.youtube.com/watch?v={video_id}"
             _sync()
 
-            # Single call: extract_info(download=True) both downloads the
-            # video and returns the info dict describing what was written,
-            # so we never have to guess the on-disk filename ourselves.
             with YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                title = info.get("title")
+                ydl.download([url])
 
             _total_download_time += time.time() - _video_download_start
             _completed_downloads += 1
             videos_completed += 1
             _update_progress(videos_completed, total)
 
-            src = _extract_downloaded_path(info)
-            if src is None or not src.exists():
-                # Fallback: scan the cache dir for the mp4 that was produced
-                candidates = list(Path(cache / "videos" / video_id).glob("*.mp4"))
-                if not candidates:
-                    print(f"ERROR: could not locate downloaded mp4 for {video_id} ({title!r}), skipping move")
-                    continue
-                src = candidates[0]
+            # Don't reconstruct the filename from the title — yt-dlp may
+            # sanitize characters when it writes the file (e.g. '|' → '｜'),
+            # so just look at what's actually in the download directory.
+            candidates = list(Path(cache / "videos" / video_id).glob("*.mp4"))
+            if not candidates:
+                print(f"ERROR: no mp4 found in cache dir for {video_id}, skipping move")
+                continue
+            src = candidates[0]
 
             dst = Path(f"Videos/{src.name}")
 
@@ -602,43 +578,36 @@ def process_item(process_id: str):
             url = f"https://www.youtube.com/watch?v={video_id}"
             _sync()
 
-            # Single call: extract_info(download=True) downloads and returns
-            # the info dict describing exactly what was written to disk.
             with YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                title = info.get("title", "")
-            vinfo = info
-            video_infos[video_id] = info
+                ydl.download([url])
+            vinfo = video_infos.get(video_id, {})
 
             _total_download_time += time.time() - _video_download_start
             _completed_downloads += 1
             videos_completed += 1
             _update_progress(videos_completed, total)
 
-            actual_path = _extract_downloaded_path(info)
-            if actual_path is None or not actual_path.exists():
-                # Fallback: scan the staging dir for the mp4 matching this episode
-                staging_dir = Path(f"cache/{current_process}/{playlist_title}/Season 01")
-                candidates = list(staging_dir.glob(f"{episode_prefix} - *.mp4"))
-                actual_path = candidates[0] if candidates else None
+            # Don't reconstruct the filename from the title — yt-dlp may
+            # sanitize characters when it writes the file (e.g. '|' → '｜'),
+            # so just look at what's actually in the staging directory for
+            # this episode.
+            staging_dir = Path(f"cache/{current_process}/{playlist_title}/Season 01")
+            candidates = list(staging_dir.glob(f"{episode_prefix} - *.mp4"))
+            if not candidates:
+                print(f"ERROR: no mp4 found in staging dir for {video_id} ({episode_prefix}), skipping")
+                continue
+            actual_path = candidates[0]
 
-            if actual_path is not None:
-                final_path = show_dir / "Season 01" / actual_path.name
-                # Strip the episode prefix off the real filename to get a
-                # stem that matches what yt-dlp actually wrote (sanitized
-                # characters and all), for use in NFO/thumb filenames.
-                stem = actual_path.stem
-                prefix_marker = f"{episode_prefix} - "
-                if stem.startswith(prefix_marker):
-                    filename_stem = stem[len(prefix_marker):]
-                else:
-                    filename_stem = stem
+            final_path = show_dir / "Season 01" / actual_path.name
+            # Strip the episode prefix off the real filename to get a stem
+            # that matches what yt-dlp actually wrote, for use in NFO/thumb
+            # filenames so they stay in sync with the video file.
+            stem = actual_path.stem
+            prefix_marker = f"{episode_prefix} - "
+            if stem.startswith(prefix_marker):
+                filename_stem = stem[len(prefix_marker):]
             else:
-                # Last-resort fallback: build the expected path from title
-                final_path = show_dir / "Season 01" / f"{episode_prefix} - {title}.mp4"
-                filename_stem = title
-                print(f"WARNING: could not determine actual downloaded path for {video_id}, "
-                      f"falling back to title-derived name — this may not match the real file.")
+                filename_stem = stem
 
             try:
                 create_video(video_id, str(final_path))

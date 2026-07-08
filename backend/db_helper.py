@@ -62,8 +62,6 @@ class Video(Base): #All videos that are downloaded including shows
     id: Mapped[str] = mapped_column(String, primary_key=True)
     path: Mapped[str] = mapped_column(String)
 
-    uses: Mapped[list[str]] = mapped_column(JSON) #As json. Links to other shows
-
 class Movie(Base): #Same as videos but only for videos that are downloaded via video mode
     __tablename__ = "movies"
 
