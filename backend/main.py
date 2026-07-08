@@ -12,7 +12,7 @@ from yt_dlp import YoutubeDL
 from db_helper import (check_user_password, create_user, get_user_by_username,
                        delete_user, create_user_hashed_password, get_all_users,
                        get_all_processes, create_process, delete_process,
-                       get_process, get_video, get_all_videos)
+                       get_process, get_video, get_all_videos, get_all_movies)
 from token_helper import verify_token, verify_admin_token, create_user_token
 from pathlib import Path
 from paths import config, cache
@@ -217,7 +217,8 @@ def get_process_api(process_id: str, user=Depends(verify_token)):
 
 #Video managing
 @app.get("/api/{token}/videos/{video_id}/thumbnail")
-def get_remote_image_api(video_id: str):
+def get_remote_image_api(token:str, video_id: str):
+    verify_token(token)
     #First check cache
     thumb_path = Path(cache / f"videos/{video_id}/thumbnail.jpg")
     if thumb_path.exists():
@@ -342,3 +343,7 @@ async def start_download_task(ws: WebSocket):
 @app.get("/api/status")
 def status_api(user=Depends(verify_token)):
     return {app.state["shared"]}
+
+@app.get("/api/movies")
+def get_movies_api(user=Depends(verify_token)):
+    return get_all_movies()

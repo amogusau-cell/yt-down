@@ -137,11 +137,11 @@ function TaskComponent({
 
     progress_bar = (
       <>
-        <div>
+        <div className="w-100">
           {connected ? (
-            <p className="text-success mb-1 mt-2">Connected</p>
+            <p className="text-success mb-1 mt-2 text-start">Connected</p>
           ) : (
-            <p className="text-danger mb-1 mt-2">Disconnected</p>
+            <p className="text-danger mb-1 mt-2 text-start">Disconnected</p>
           )}
           <div
             className="progress rounded-pill"

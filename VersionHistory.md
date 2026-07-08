@@ -12,3 +12,4 @@ V0.0.0 -> Inital release. Has functions to download videos and playlists. Also a
 V0.0.1 -> Added health checks to the server.
 V0.0.2 -> Fixed a bug where the docker container would look unhealthy.
 V0.0.3 -> Installed deno to the container to allow yt-dlp to run as intended.
+V0.0.4 -> Fixed some bugs. Prepared backend for next version. --WARNING--: Not compatible with older versions. You need to delete config folder in order for this version to work properly. This will reset users/downloaded videos but will not delete already downloaded videos.

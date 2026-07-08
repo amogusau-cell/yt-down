@@ -7,7 +7,8 @@ from xml.dom import minidom
 
 import requests
 from yt_dlp import YoutubeDL
-from db_helper import get_all_processes, get_process, get_video, create_video, set_process_finished
+from db_helper import get_all_processes, get_process, get_video, create_video, set_process_finished, create_movie, \
+    create_show
 import json
 
 from paths import cache
@@ -161,6 +162,26 @@ def _pretty_xml(root: ET.Element) -> str:
     return reparsed.toprettyxml(indent="  ", encoding=None)
 
 
+def _extract_downloaded_path(info: dict) -> Path | None:
+    """
+    Return the actual on-disk path yt-dlp wrote for this download, using
+    yt-dlp's own report of what it produced (post-merge, post-sanitization)
+    rather than reconstructing the filename from the video title ourselves.
+    yt-dlp may substitute filesystem-unsafe characters (e.g. '|' → '｜') when
+    it writes the file, so any hand-built path can silently mismatch.
+    """
+    requested = info.get("requested_downloads") or []
+    if requested:
+        fp = requested[0].get("filepath") or requested[0].get("_filename")
+        if fp:
+            return Path(fp)
+    # Fallback for older yt-dlp / edge cases
+    fp = info.get("filepath") or info.get("_filename")
+    if fp:
+        return Path(fp)
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Jellyfin NFO writers
 # ---------------------------------------------------------------------------
@@ -230,10 +251,18 @@ def _write_episode_nfo(
     ep_index: int,
     show_dir: Path,
     episode_prefix: str,
+    filename_stem: str | None = None,
 ) -> None:
     """
-    Write <episode_prefix> - <title>.nfo and <episode_prefix> - <title>-thumb.jpg
+    Write <episode_prefix> - <name>.nfo and <episode_prefix> - <name>-thumb.jpg
     into *show_dir*/Season 01/.
+
+    *filename_stem*, when provided, should be the actual on-disk stem of the
+    downloaded video file (i.e. Path(actual_video_file).stem, with the
+    episode prefix stripped if present). This keeps the NFO/thumb filenames
+    in sync with whatever yt-dlp actually wrote, since yt-dlp may sanitize
+    characters in the title (e.g. '|' → '｜') when saving the video file.
+    Falls back to the raw title if not given.
 
     NFO schema: https://kodi.wiki/view/NFO_files/Episodes
     """
@@ -241,7 +270,7 @@ def _write_episode_nfo(
     season_dir = show_dir / "Season 01"
     season_dir.mkdir(exist_ok=True, parents=True)
 
-    safe_title = title  # filenames already use this exact title
+    safe_title = filename_stem if filename_stem else title
     nfo_path  = season_dir / f"{episode_prefix} - {safe_title}.nfo"
     thumb_path = season_dir / f"{episode_prefix} - {safe_title}-thumb.jpg"
 
@@ -391,6 +420,7 @@ def process_item(process_id: str):
             _copy_existing_video(video_id, dst)
             try:
                 create_video(video_id, str(dst))
+                create_movie(video_id)
             except Exception as e:
                 print(e)
             videos_completed += 1
@@ -430,19 +460,6 @@ def process_item(process_id: str):
                 "merge_output_format": "mp4",
                 "remote-components": "ejs:npm",
             }
-            opts2 = {
-                "outtmpl": "cache/videos/%(id)s/%(title)s.%(ext)s",
-                "continuedl": True,
-                "format": "bestvideo+bestaudio/best",
-                "concurrent_fragment_downloads": 4,
-                "writesubtitles": True,
-                "writeautomaticsub": True,
-                "subtitleslangs": ["en"],
-                "subtitlesformat": "vtt",
-                "embedsubtitles": False,
-                "merge_output_format": "mp4",
-                "remote-components": "ejs:npm",
-            }
 
             opts["progress_hooks"] = [progress]
             current_video_progress = 0.0
@@ -453,33 +470,42 @@ def process_item(process_id: str):
             url = f"https://www.youtube.com/watch?v={video_id}"
             _sync()
 
-            title = ""
-            with YoutubeDL(opts2) as ydl:
-                info = ydl.extract_info(url, download=False)
-                title = info.get("title")
+            # Single call: extract_info(download=True) both downloads the
+            # video and returns the info dict describing what was written,
+            # so we never have to guess the on-disk filename ourselves.
             with YoutubeDL(opts) as ydl:
-                ydl.download([url])
+                info = ydl.extract_info(url, download=True)
+                title = info.get("title")
 
             _total_download_time += time.time() - _video_download_start
             _completed_downloads += 1
             videos_completed += 1
             _update_progress(videos_completed, total)
 
-            src = Path(cache / "videos" / video_id / f"{title}.mp4")
-            dst = Path(f"Videos/{title}.mp4")
+            src = _extract_downloaded_path(info)
+            if src is None or not src.exists():
+                # Fallback: scan the cache dir for the mp4 that was produced
+                candidates = list(Path(cache / "videos" / video_id).glob("*.mp4"))
+                if not candidates:
+                    print(f"ERROR: could not locate downloaded mp4 for {video_id} ({title!r}), skipping move")
+                    continue
+                src = candidates[0]
+
+            dst = Path(f"Videos/{src.name}")
 
             shutil.move(src, dst)
             print(f"Moved {src} to {dst}")
 
             try:
                 create_video(video_id, str(dst))
+                create_movie(video_id)
             except Exception as e:
                 print(e)
 
             for i in Path(cache / "videos" / video_id).glob("*.vtt"):
                 vtt_dst = Path(f"Videos/{i.name}")
                 shutil.move(i, vtt_dst)
-                print(f"Moved {vtt_dst} to {dst}")
+                print(f"Moved {i} to {vtt_dst}")
 
     # -----------------------------------------------------------------------
     # Playlist process
@@ -566,18 +592,6 @@ def process_item(process_id: str):
                 "merge_output_format": "mp4",
                 "remote-components": "ejs:npm",
             }
-            opts2 = {
-                "continuedl": True,
-                "format": "bestvideo+bestaudio/best",
-                "concurrent_fragment_downloads": 4,
-                "writesubtitles": True,
-                "writeautomaticsub": True,
-                "subtitleslangs": ["en"],
-                "subtitlesformat": "vtt",
-                "embedsubtitles": False,
-                "merge_output_format": "mp4",
-                "remote-components": "ejs:npm",
-            }
 
             opts["progress_hooks"] = [progress]
             current_video_progress = 0.0
@@ -588,34 +602,56 @@ def process_item(process_id: str):
             url = f"https://www.youtube.com/watch?v={video_id}"
             _sync()
 
-            title = ""
-            vinfo = video_infos.get(video_id)
-            if vinfo:
-                title = vinfo.get("title", "")
-            if not title:
-                with YoutubeDL(opts2) as ydl:
-                    vinfo = ydl.extract_info(url, download=False)
-                    title = vinfo.get("title", "")
-                video_infos[video_id] = vinfo
-
+            # Single call: extract_info(download=True) downloads and returns
+            # the info dict describing exactly what was written to disk.
             with YoutubeDL(opts) as ydl:
-                ydl.download([url])
+                info = ydl.extract_info(url, download=True)
+                title = info.get("title", "")
+            vinfo = info
+            video_infos[video_id] = info
 
             _total_download_time += time.time() - _video_download_start
             _completed_downloads += 1
             videos_completed += 1
             _update_progress(videos_completed, total)
 
-            final_path = show_dir / "Season 01" / f"{episode_prefix} - {title}.mp4"
+            actual_path = _extract_downloaded_path(info)
+            if actual_path is None or not actual_path.exists():
+                # Fallback: scan the staging dir for the mp4 matching this episode
+                staging_dir = Path(f"cache/{current_process}/{playlist_title}/Season 01")
+                candidates = list(staging_dir.glob(f"{episode_prefix} - *.mp4"))
+                actual_path = candidates[0] if candidates else None
+
+            if actual_path is not None:
+                final_path = show_dir / "Season 01" / actual_path.name
+                # Strip the episode prefix off the real filename to get a
+                # stem that matches what yt-dlp actually wrote (sanitized
+                # characters and all), for use in NFO/thumb filenames.
+                stem = actual_path.stem
+                prefix_marker = f"{episode_prefix} - "
+                if stem.startswith(prefix_marker):
+                    filename_stem = stem[len(prefix_marker):]
+                else:
+                    filename_stem = stem
+            else:
+                # Last-resort fallback: build the expected path from title
+                final_path = show_dir / "Season 01" / f"{episode_prefix} - {title}.mp4"
+                filename_stem = title
+                print(f"WARNING: could not determine actual downloaded path for {video_id}, "
+                      f"falling back to title-derived name — this may not match the real file.")
 
             try:
                 create_video(video_id, str(final_path))
             except Exception as e:
                 print(e)
 
-            # Write episode NFO + thumbnail right after the download completes
-            _write_episode_nfo(vinfo, vid_index, show_dir, episode_prefix)
+            # Write episode NFO + thumbnail right after the download completes,
+            # using the real on-disk filename stem so NFO/thumb names match
+            # the video file exactly (yt-dlp may sanitize the title when
+            # writing the video, e.g. '|' → '｜').
+            _write_episode_nfo(vinfo, vid_index, show_dir, episode_prefix, filename_stem=filename_stem)
 
+        create_show(process.playlist, videos_to_process)
         # Move the entire staged show tree into its final Jellyfin location
         src = Path(f"cache/{process_id}/{playlist_title}")
         dst = show_dir

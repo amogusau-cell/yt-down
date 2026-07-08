@@ -53,3 +53,5 @@ backend/Videos/
 
 build-command
 .env
+
+no-git/

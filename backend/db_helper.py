@@ -56,11 +56,43 @@ class Process(Base):
     playlist: Mapped[str] = mapped_column(String)
 
 
-class Video(Base):
+class Video(Base): #All videos that are downloaded including shows
     __tablename__ = "videos"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     path: Mapped[str] = mapped_column(String)
+
+    uses: Mapped[list[str]] = mapped_column(JSON) #As json. Links to other shows
+
+class Movie(Base): #Same as videos but only for videos that are downloaded via video mode
+    __tablename__ = "movies"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+
+class Show(Base):
+    __tablename__ = "shows"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    videos: Mapped[list[str]] = mapped_column(JSON)
+
+class Folder(Base):
+    __tablename__ = "paths"
+
+    name: Mapped[str] = mapped_column(String, primary_key=True)
+    path: Mapped[str] = mapped_column(String)
+    type: Mapped[str] = mapped_column(String) #Shows/Videos/Cache
+
+    #Rules
+    min_free_space: Mapped[int] = mapped_column(Integer) #Space left on the drive
+    max_used_space: Mapped[int] = mapped_column(Integer) #Space used by this folder
+    fallback_level: Mapped[int] = mapped_column(Integer)
+    #0 means used first, 1 means used after 0's rules don't match
+    whitelist_enabled: Mapped[bool] = mapped_column(Boolean) #Ignored for cache type
+    whitelist: Mapped[list[str]] = mapped_column(JSON)
+    whitelist_admins: Mapped[bool] = mapped_column(Boolean) #Add admins to the whitelist
+    blacklist_enabled: Mapped[bool] = mapped_column(Boolean) #Ignored for cache type
+    blacklist: Mapped[list[str]] = mapped_column(JSON)
+    blacklist_admins: Mapped[bool] = mapped_column(Boolean) #Add admins to the blacklist
 
 
 Base.metadata.create_all(engine)
@@ -187,4 +219,79 @@ def delete_video(vid_id):
     with SessionLocal() as session:
         video = session.query(Video).filter(Video.id == vid_id).first()
         session.delete(video)
+        session.commit()
+
+
+def create_movie(mov_id: str):
+    with SessionLocal() as session:
+        mov = Movie(id=mov_id)
+        session.add(mov)
+        session.commit()
+
+
+def get_movie(mov_id):
+    with SessionLocal() as session:
+        mov = session.query(Movie).filter(Movie.id == mov_id).first()
+        return mov
+
+
+def get_all_movies():
+    with SessionLocal() as session:
+        return session.query(Movie).all()
+
+
+def delete_movie(mov_id):
+    with SessionLocal() as session:
+        mov = session.query(Movie).filter(Movie.id == mov_id).first()
+        session.delete(mov)
+        session.commit()
+
+
+def create_show(show_id: str, videos: list[str]):
+    with SessionLocal() as session:
+        show = Show(id=show_id, videos=videos)
+        session.add(show)
+        session.commit()
+
+
+def get_show(show_id):
+    with SessionLocal() as session:
+        show = session.query(Show).filter(Show.id == show_id).first()
+        return show
+
+
+def get_all_shows():
+    with SessionLocal() as session:
+        return session.query(Show).all()
+
+
+def delete_show(show_id):
+    with SessionLocal() as session:
+        show = session.query(Show).filter(Show.id == show_id).first()
+        session.delete(show)
+        session.commit()
+
+
+def create_folder(show_id: str, videos: list[str]):
+    with SessionLocal() as session:
+        show = Show(id=show_id, videos=videos)
+        session.add(show)
+        session.commit()
+
+
+def get_folder(show_id):
+    with SessionLocal() as session:
+        show = session.query(Show).filter(Show.id == show_id).first()
+        return show
+
+
+def get_all_folders():
+    with SessionLocal() as session:
+        return session.query(Show).all()
+
+
+def delete_folder(show_id):
+    with SessionLocal() as session:
+        show = session.query(Show).filter(Show.id == show_id).first()
+        session.delete(show)
         session.commit()
