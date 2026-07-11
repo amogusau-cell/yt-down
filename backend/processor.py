@@ -515,13 +515,27 @@ def process_item(process_id: str):
 
         print(videos_to_process)
 
-        # Jellyfin show directory tree
+        # Jellyfin show directory tree (final destination)
         show_dir = Path(f"Shows/{playlist_title}")
-        show_season_dir = show_dir / "Season 01"
-        show_season_dir.mkdir(exist_ok=True, parents=True)
+        show_final_season_dir = show_dir / "Season 01"
+        show_dir.mkdir(exist_ok=True, parents=True)
+        show_final_season_dir.mkdir(exist_ok=True, parents=True)
 
-        # Write show-level NFO + artwork before downloading anything
-        _write_show_nfo(playlist_info, show_dir)
+        # Staging (cache) directory tree — videos, subtitles, NFOs, and
+        # artwork are all downloaded/written here first. Only once a given
+        # set of files is fully ready does it get moved into show_dir.
+        show_staging_dir = Path(f"cache/{process_id}/{playlist_title}")
+        show_staging_season_dir = show_staging_dir / "Season 01"
+        show_staging_season_dir.mkdir(exist_ok=True, parents=True)
+
+        # Write show-level NFO + artwork into the cache first, then move the
+        # finished files into their final location.
+        _write_show_nfo(playlist_info, show_staging_dir)
+        for item in show_staging_dir.iterdir():
+            if item.is_file():
+                target = show_dir / item.name
+                shutil.move(str(item), str(target))
+                print(f"Moved {item} → {target}")
 
         # Download thumbnails first (cached for later NFO use)
         video_infos: dict[str, dict] = {}   # video_id → full yt-dlp info dict
@@ -591,14 +605,12 @@ def process_item(process_id: str):
             # sanitize characters when it writes the file (e.g. '|' → '｜'),
             # so just look at what's actually in the staging directory for
             # this episode.
-            staging_dir = Path(f"cache/{current_process}/{playlist_title}/Season 01")
-            candidates = list(staging_dir.glob(f"{episode_prefix} - *.mp4"))
+            candidates = list(show_staging_season_dir.glob(f"{episode_prefix} - *.mp4"))
             if not candidates:
                 print(f"ERROR: no mp4 found in staging dir for {video_id} ({episode_prefix}), skipping")
                 continue
             actual_path = candidates[0]
 
-            final_path = show_dir / "Season 01" / actual_path.name
             # Strip the episode prefix off the real filename to get a stem
             # that matches what yt-dlp actually wrote, for use in NFO/thumb
             # filenames so they stay in sync with the video file.
@@ -609,35 +621,29 @@ def process_item(process_id: str):
             else:
                 filename_stem = stem
 
+            # Write episode NFO + thumbnail into the staging dir, right next
+            # to the freshly-downloaded video, using the real on-disk
+            # filename stem so NFO/thumb names match the video file exactly.
+            _write_episode_nfo(vinfo, vid_index, show_staging_dir, episode_prefix, filename_stem=filename_stem)
+
+            # The video, subtitles, NFO, and thumbnail for this episode are
+            # now all sitting in the staging dir — move the whole set into
+            # the final show directory together, right now, instead of
+            # waiting for the rest of the playlist to finish downloading.
+            for f in show_staging_season_dir.glob(f"{episode_prefix} - *"):
+                target = show_final_season_dir / f.name
+                shutil.move(str(f), str(target))
+                print(f"Moved {f} → {target}")
+
+            final_path = show_final_season_dir / actual_path.name
             try:
                 create_video(video_id, str(final_path))
             except Exception as e:
                 print(e)
 
-            # Write episode NFO + thumbnail right after the download completes,
-            # using the real on-disk filename stem so NFO/thumb names match
-            # the video file exactly (yt-dlp may sanitize the title when
-            # writing the video, e.g. '|' → '｜').
-            _write_episode_nfo(vinfo, vid_index, show_dir, episode_prefix, filename_stem=filename_stem)
-
         create_show(process.playlist, videos_to_process)
-        # Move the entire staged show tree into its final Jellyfin location
-        src = Path(f"cache/{process_id}/{playlist_title}")
-        dst = show_dir
-        if src.exists():
-            if dst.exists():
-                for item in src.rglob("*"):
-                    rel = item.relative_to(src)
-                    target = dst / rel
-                    if item.is_dir():
-                        target.mkdir(exist_ok=True, parents=True)
-                    else:
-                        shutil.move(str(item), str(target))
-                        print(f"Moved {item} → {target}")
-                shutil.rmtree(src, ignore_errors=True)
-            else:
-                shutil.move(str(src), str(dst))
-                print(f"Moved {src} → {dst}")
+        # Clean up the now-empty staging directory for this playlist.
+        shutil.rmtree(show_staging_dir, ignore_errors=True)
 
     set_process_finished(current_process)
 
